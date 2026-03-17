@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Liberty Funding - Suppression Sync
-Main entry point - fetches suppression data from GoHighLevel and syncs to Google Sheets
+Main entry point - fetches suppression data from GoHighLevel, Zoho and syncs to Google Sheets
 """
 
 import sys
@@ -11,6 +11,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
 from src.api.gohighlevel import GoHighLevelClient
+from src.api.zoho import ZohoClient
 from src.api.googlesheets import GoogleSheetsClient
 from src.utils.logger import logger
 from config.settings import DRY_RUN
@@ -27,32 +28,63 @@ def main():
     if dry_run:
         logger.info("[DRY RUN MODE - No changes will be made]")
 
+    all_suppression_data = []
+
+    # ========== FETCH FROM GOHIGHLEVEL ==========
     try:
         logger.info("Fetching suppression data from GoHighLevel...")
         ghl_client = GoHighLevelClient()
-        suppression_data = ghl_client.get_all_suppressed_contacts()
-        logger.info(f"  Found {len(suppression_data)} suppressed contacts")
+        ghl_data = ghl_client.get_all_suppressed_contacts()
+        logger.info(f"  Found {len(ghl_data)} suppressed contacts from GoHighLevel")
 
-        if suppression_data:
-            for record in suppression_data[:3]:
+        if ghl_data:
+            for record in ghl_data[:3]:
                 logger.info(
                     f"  Sample: {record.get('email')} - {record.get('suppression_source')}"
                 )
-            if len(suppression_data) > 3:
-                logger.info(f"  ... and {len(suppression_data) - 3} more")
+            if len(ghl_data) > 3:
+                logger.info(f"  ... and {len(ghl_data) - 3} more")
+            all_suppression_data.extend(ghl_data)
 
     except Exception as e:
         logger.error(f"  GoHighLevel error: {e}")
-        suppression_data = []
+        ghl_data = []
 
-    if not suppression_data:
-        logger.warning("No suppression data found!")
+    # ========== FETCH FROM ZOHO ==========
+    try:
+        logger.info("Fetching suppression data from Zoho...")
+        zoho_client = ZohoClient()
+        zoho_data = zoho_client.get_all_bounced_contacts()
+        logger.info(f"  Found {len(zoho_data)} bounced contacts from Zoho")
+
+        if zoho_data:
+            for record in zoho_data[:3]:
+                logger.info(
+                    f"  Sample: {record.get('email')} - {record.get('suppression_source')}"
+                )
+            if len(zoho_data) > 3:
+                logger.info(f"  ... and {len(zoho_data) - 3} more")
+            all_suppression_data.extend(zoho_data)
+
+    except Exception as e:
+        logger.error(f"  Zoho error: {e}")
+        zoho_data = []
+
+    # ========== CHECK IF WE HAVE DATA ==========
+    if not all_suppression_data:
+        logger.warning("No suppression data found from any source!")
+        logger.warning("Please check:")
+        logger.warning("  1. GoHighLevel API key permissions")
+        logger.warning("  2. Zoho refresh token")
         return
 
+    logger.info(f"Total suppression records: {len(all_suppression_data)}")
+
+    # ========== SYNC TO GOOGLE SHEETS ==========
     logger.info("Syncing to Google Sheet...")
     try:
         sheets_client = GoogleSheetsClient()
-        result = sheets_client.sync_data(suppression_data, dry_run=dry_run)
+        result = sheets_client.sync_data(all_suppression_data, dry_run=dry_run)
         logger.info(f"  Updated: {result['updated']}, Added: {result['added']}")
 
     except Exception as e:
