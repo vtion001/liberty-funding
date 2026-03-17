@@ -27,3 +27,5 @@ logs/
 
 # Data
 data/
+credentials.json
+.env
