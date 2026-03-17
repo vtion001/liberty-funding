@@ -1,0 +1,10 @@
+# Google Sheets
+gspread
+google-auth
+google-auth-oauthlib
+
+# HTTP
+requests
+
+# Date handling
+python-dateutil
