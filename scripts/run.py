@@ -1,76 +1,64 @@
 #!/usr/bin/env python3
 """
-Liberty Funding - Bounce Rate Automation
-Main entry point
+Liberty Funding - Suppression Sync
+Main entry point - fetches suppression data from GoHighLevel and syncs to Google Sheets
 """
+
 import sys
 import os
 
-# Add project root to path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
 from src.api.gohighlevel import GoHighLevelClient
-from src.api.zoho import ZohoClient
 from src.api.googlesheets import GoogleSheetsClient
-from src.processors.data_processor import DataProcessor
 from src.utils.logger import logger
-from config.settings import GoogleSheetsConfig
+from config.settings import DRY_RUN
 
 
 def main():
     """Main execution"""
     logger.info("=" * 50)
-    logger.info("Liberty Funding - Bounce Rate Update")
+    logger.info("Liberty Funding - Suppression Sync")
     logger.info("=" * 50)
-    
+
+    dry_run = DRY_RUN
+
+    if dry_run:
+        logger.info("[DRY RUN MODE - No changes will be made]")
+
     try:
-        # Step 1: Fetch GoHighLevel data
-        logger.info("Fetching GoHighLevel data...")
+        logger.info("Fetching suppression data from GoHighLevel...")
         ghl_client = GoHighLevelClient()
-        ghl_data = ghl_client.get_all_bounce_data()
-        logger.info(f"  Got {len(ghl_data)} records from GoHighLevel")
-        
+        suppression_data = ghl_client.get_all_suppressed_contacts()
+        logger.info(f"  Found {len(suppression_data)} suppressed contacts")
+
+        if suppression_data:
+            for record in suppression_data[:3]:
+                logger.info(
+                    f"  Sample: {record.get('email')} - {record.get('suppression_source')}"
+                )
+            if len(suppression_data) > 3:
+                logger.info(f"  ... and {len(suppression_data) - 3} more")
+
     except Exception as e:
-        logger.warning(f"  GoHighLevel error: {e}")
-        ghl_data = []
-    
-    try:
-        # Step 2: Fetch Zoho data
-        logger.info("Fetching Zoho data...")
-        zoho_client = ZohoClient()
-        zoho_data = zoho_client.get_all_bounce_data()
-        logger.info(f"  Got {len(zoho_data)} records from Zoho")
-        
-    except Exception as e:
-        logger.warning(f"  Zoho error: {e}")
-        zoho_data = []
-    
-    # Step 3: Process data
-    logger.info("Processing data...")
-    processor = DataProcessor()
-    processed = processor.process(ghl_data, zoho_data)
-    logger.info(f"  Processed {len(processed)} records")
-    
-    # Print summary
-    summary = processor.get_summary()
-    logger.info(f"Summary: {summary}")
-    
-    if not processed:
-        logger.warning("No data to update!")
+        logger.error(f"  GoHighLevel error: {e}")
+        suppression_data = []
+
+    if not suppression_data:
+        logger.warning("No suppression data found!")
         return
-    
-    # Step 4: Update Google Sheet
-    logger.info("Updating Google Sheet...")
+
+    logger.info("Syncing to Google Sheet...")
     try:
         sheets_client = GoogleSheetsClient()
-        rows = sheets_client.append_data(processed)
-        logger.info(f"  Added {rows} rows to sheet")
-        
+        result = sheets_client.sync_data(suppression_data, dry_run=dry_run)
+        logger.info(f"  Updated: {result['updated']}, Added: {result['added']}")
+
     except Exception as e:
         logger.error(f"  Google Sheets error: {e}")
         logger.info("  Data processed but not uploaded. Check credentials.")
-    
+
     logger.info("=" * 50)
     logger.info("Done!")
     logger.info("=" * 50)
