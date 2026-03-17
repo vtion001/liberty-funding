@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).parent.parent
 CONFIG_DIR = PROJECT_ROOT / "config"
@@ -9,14 +10,16 @@ DATA_DIR = PROJECT_ROOT / "data"
 
 DATA_DIR.mkdir(exist_ok=True)
 
+load_dotenv(PROJECT_ROOT / ".env")
+
 
 class GoHighLevelConfig:
     """GoHighLevel API settings"""
 
-    API_KEY = "pit-7ffb3619-7b11-482f-94bf-af1c319b7e23"
+    API_KEY = os.environ.get("GOHIGHLEVEL_API_KEY", "")
     BASE_URL = "https://api.gohighlevel.com"
     TIMEOUT = 30
-    LOCATION_ID = "cyfdRTpFMjTzSBmxBpHk"
+    LOCATION_ID = os.environ.get("GOHIGHLEVEL_LOCATION_ID", "")
 
 
 class ZohoConfig:
@@ -31,9 +34,11 @@ class ZohoConfig:
 class GoogleSheetsConfig:
     """Google Sheets settings"""
 
-    CREDENTIALS_FILE = str(PROJECT_ROOT / "credentials.json")
-    SPREADSHEET_ID = "1qktMN2WAXSXtDNn_UVWe8quJ9ysBjGUDIpWxl45efIA"
-    SHEET_NAME = "suppression register"
+    CREDENTIALS_FILE = os.environ.get(
+        "GOOGLE_CREDENTIALS", str(PROJECT_ROOT / "credentials.json")
+    )
+    SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID", "")
+    SHEET_NAME = os.environ.get("SHEET_NAME", "suppression register")
 
     COLUMN_MAPPING = {
         "date_added": "DATE ADDED",

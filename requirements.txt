@@ -8,3 +8,6 @@ requests
 
 # Date handling
 python-dateutil
+
+# Environment variables
+python-dotenv
