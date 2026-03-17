@@ -23,38 +23,33 @@ class GoHighLevelClient:
         )
 
     def get_suppressed_contacts(self, limit: int = 100) -> List[Dict]:
-        """
-        Get contacts with suppression/bounce data from GoHighLevel
-        """
+        """Get contacts with suppression/bounce data from GoHighLevel"""
+        
+        # Show diagnostic info
+        print(f"  API Key: {self.api_key[:20]}...")
+        print(f"  Location ID: {self.location_id}")
+        print(f"  Key type: {'Private Integration (pit-)' if self.api_key.startswith('pit-') else 'Agency/API Key'}")
+        
         all_contacts = []
         
-        # Try different endpoint approaches
+        # Try multiple approaches
         approaches = [
-            # Approach 1: POST to search endpoint with locationId in body
+            # POST to search endpoint
             {
                 "method": "POST",
                 "url": f"{self.base_url}/v1/contacts/search",
-                "params": {},
-                "data": {"locationId": self.location_id, "limit": min(100, limit)} if self.location_id else {"limit": min(100, limit)}
+                "data": {"locationId": self.location_id, "limit": min(50, limit)} if self.location_id else {"limit": min(50, limit)}
             },
-            # Approach 2: GET with locationId
+            # GET with locationId
             {
                 "method": "GET",
                 "url": f"{self.base_url}/v1/contacts",
-                "params": {"locationId": self.location_id, "limit": min(100, limit)} if self.location_id else {"limit": min(100, limit)},
-                "data": None
-            },
-            # Approach 3: Without location filter
-            {
-                "method": "GET",
-                "url": f"{self.base_url}/v1/contacts",
-                "params": {"limit": min(100, limit)},
-                "data": None
+                "params": {"locationId": self.location_id, "limit": min(50, limit)} if self.location_id else {"limit": min(50, limit)}
             },
         ]
 
         for i, approach in enumerate(approaches):
-            print(f"  Trying: {approach['method']} {approach['url']}")
+            print(f"  Trying approach {i+1}: {approach['method']} {approach['url']}")
             
             try:
                 if approach["method"] == "POST":
@@ -72,17 +67,13 @@ class GoHighLevelClient:
                 
                 print(f"    Status: {response.status_code}")
                 
+                # Check for different status codes
                 if response.status_code == 200:
                     data = response.json()
-                    contacts = (
-                        data.get("contacts")
-                        or data.get("data")
-                        or data.get("results")
-                        or []
-                    )
+                    contacts = data.get("contacts") or data.get("data") or []
                     
                     if contacts:
-                        print(f"    Found {len(contacts)} contacts!")
+                        print(f"    ✅ Found {len(contacts)} contacts!")
                         for contact in contacts:
                             record = self._process_contact(contact)
                             if record:
@@ -90,29 +81,32 @@ class GoHighLevelClient:
                         break
                         
                 elif response.status_code == 401:
-                    print(f"    ERROR: Unauthorized - check API key")
+                    print(f"    ❌ Unauthorized - API key invalid or no permission")
+                    break
+                elif response.status_code == 403:
+                    print(f"    ❌ Forbidden - API key doesn't have required scope")
                     break
                 elif response.status_code == 404:
-                    print(f"    Not found - trying next approach")
-                    continue
+                    print(f"    ❌ Not found - endpoint may not exist for this key type")
                 else:
-                    print(f"    Response: {response.text[:200]}")
+                    print(f"    Response: {response.text[:100]}")
                     
             except Exception as e:
                 print(f"    Exception: {e}")
-                continue
 
         if not all_contacts:
-            print("  ⚠️  No suppression data found!")
+            print("  ⚠️ No contacts returned!")
             print("")
-            print("  POSSIBLE ISSUES:")
-            print("  1. API key doesn't have 'contacts.read' scope")
-            print("     → Go to GoHighLevel > Settings > Integrations > API Keys")
-            print("     → Create a new Agency API Key with contacts.read permission")
-            print("  2. Location ID is incorrect")
-            print("     → Verify the location ID in GoHighLevel > Locations")
-            print("  3. API key is a Private Integration token (starts with 'pit-')")
-            print("     → These have limited access - use an Agency API Key instead")
+            print("  DIAGNOSIS:")
+            if self.api_key.startswith("pit-"):
+                print("  → Using Private Integration token (pit-)")
+                print("  → Private Integration tokens have LIMITED access")
+                print("  → Need to use AGENCY API KEY instead")
+                print("  → Go to GoHighLevel > Settings > Integrations > API Keys")
+                print("  → Create NEW 'Agency API Key' (not Private Integration)")
+            else:
+                print("  → Check if Location ID is correct")
+                print("  → Verify API key has 'contacts.read' permission")
 
         return all_contacts[:limit]
 
@@ -124,9 +118,6 @@ class GoHighLevelClient:
 
         dnd = contact.get("dnd", False)
         tags = contact.get("tags", [])
-        
-        is_unsubscribed = contact.get("unsubscribed", False)
-        is_hard_bounce = contact.get("invalid_email", False) or contact.get("hard_bounce", False)
 
         suppression_source = None
         reason = None
@@ -138,17 +129,8 @@ class GoHighLevelClient:
             reason = "Do Not Disturb"
             rule_id = "R-SUP-DND-001"
             suppression_tag = "suppress_dnd"
-        elif is_hard_bounce:
-            suppression_source = "Hard Bounce"
-            reason = "Invalid Email"
-            rule_id = "R-SUP-H-002"
-            suppression_tag = "suppress_invalid_email"
-        elif is_unsubscribed:
-            suppression_source = "Unsubscribe List"
-            reason = "Unsubscribed"
-            rule_id = "R-SUP-H-003"
-            suppression_tag = "suppress_unsub"
 
+        # Check tags for bounce/unsubscribe
         if not suppression_source and tags:
             for tag in tags:
                 tag_lower = tag.lower() if isinstance(tag, str) else ""
@@ -166,6 +148,7 @@ class GoHighLevelClient:
                     break
 
         if not suppression_source:
+            # Return contact but mark as "Active" - not suppressed
             return None
 
         record = {
@@ -187,37 +170,6 @@ class GoHighLevelClient:
     def get_all_suppressed_contacts(self) -> List[Dict]:
         """Get all suppressed contacts"""
         return self.get_suppressed_contacts(limit=500)
-
-    def test_connection(self) -> dict:
-        """Test API connection"""
-        print("Testing GoHighLevel API connection...")
-        print(f"  API Key: {self.api_key[:10]}...")
-        print(f"  Location ID: {self.location_id}")
-
-        # Test base URL
-        try:
-            response = self._session.get(self.base_url, timeout=5)
-            print(f"  Base URL: {response.text}")
-        except Exception as e:
-            print(f"  Base URL test failed: {e}")
-
-        # Try contacts endpoint
-        endpoint = f"{self.base_url}/v1/contacts"
-        params = {"locationId": self.location_id, "limit": 1} if self.location_id else {"limit": 1}
-
-        try:
-            response = self._session.get(endpoint, params=params, timeout=self.timeout)
-            print(f"  Contacts Status: {response.status_code}")
-            print(f"  Response: {response.text[:200]}")
-
-            if response.status_code == 200:
-                return {"success": True, "data": response.json()}
-            else:
-                return {"success": False, "error": response.text}
-
-        except Exception as e:
-            print(f"  Exception: {e}")
-            return {"success": False, "error": str(e)}
 
 
 if __name__ == "__main__":
