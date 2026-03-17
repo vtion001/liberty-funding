@@ -1,4 +1,4 @@
-"""Zoho API Client - Fetches contacts and checks for suppression status"""
+"""Zoho API Client - Supports Zoho Campaigns for bounce data"""
 import requests
 from typing import Dict, List, Optional
 from datetime import datetime
@@ -7,21 +7,12 @@ from config.settings import ZohoConfig
 
 
 class ZohoClient:
-    """Client for Zoho Mail/CRM API using OAuth2"""
+    """Client for Zoho Campaigns API"""
     
-    ZOHO_ACCOUNTS = {
-        "mail": "https://accounts.zoho.com",
-        "crm": "https://accounts.zoho.com", 
-    }
+    CAMPAIGNS_API = "https://campaigns.zoho.com/api/v1"
     
-    ZOHO_APIS = {
-        "mail": "https://mail.zoho.com",
-        "crm": "https://www.zohoapis.com/crm",
-    }
-    
-    def __init__(self, product: str = "crm", client_id: str = None, client_secret: str = None, 
+    def __init__(self, client_id: str = None, client_secret: str = None, 
                  org_id: str = None, refresh_token: str = None):
-        self.product = product
         self.client_id = client_id or ZohoConfig.CLIENT_ID
         self.client_secret = client_secret or ZohoConfig.CLIENT_SECRET
         self.org_id = org_id or ZohoConfig.ORGANIZATION_ID
@@ -31,14 +22,6 @@ class ZohoClient:
         self._access_token = None
         self._token_expiry = 0
         self._session = requests.Session()
-    
-    @property
-    def accounts_url(self) -> str:
-        return self.ZOHO_ACCOUNTS.get(self.product, self.ZOHO_ACCOUNTS["crm"])
-    
-    @property
-    def api_url(self) -> str:
-        return self.ZOHO_APIS.get(self.product, self.ZOHO_APIS["crm"])
     
     def _get_access_token(self) -> str:
         """Get or refresh access token"""
@@ -50,7 +33,8 @@ class ZohoClient:
         if not self.refresh_token:
             return None
         
-        token_url = f"{self.accounts_url}/oauth/v2/token"
+        # Try to get token
+        token_url = "https://accounts.zoho.com/oauth/v2/token"
         data = {
             "refresh_token": self.refresh_token,
             "client_id": self.client_id,
@@ -61,131 +45,119 @@ class ZohoClient:
         try:
             response = requests.post(token_url, data=data, timeout=self.timeout)
             if response.status_code == 200:
-                token_data = response.json()
-                self._access_token = token_data.get("access_token")
+                result = response.json()
+                self._access_token = result.get("access_token")
                 self._token_expiry = current_time + 3500
                 return self._access_token
         except:
             pass
         return None
     
-    def get_all_contacts(self, limit: int = 200) -> List[Dict]:
-        """Get ALL contacts from Zoho CRM"""
+    def get_campaigns(self) -> List[Dict]:
+        """Get all campaigns from Zoho Campaigns"""
         
         access_token = self._get_access_token()
         if not access_token:
             print("  ⚠️ No access token!")
             return []
         
-        headers = {
-            "Authorization": f"Zoho-oauthtoken {access_token}",
-            "Content-Type": "application/json"
-        }
+        headers = {"Authorization": f"Zoho-oauthtoken {access_token}"}
         
-        all_contacts = []
-        
-        # Get contacts from CRM
-        print(f"  Fetching contacts from Zoho CRM...")
+        print("  Fetching campaigns from Zoho Campaigns...")
         
         try:
-            url = f"{self.api_url}/v2/Contacts"
-            params = {"per_page": min(200, limit)}
+            # Get list of campaigns
+            url = f"{self.CAMPAIGNS_API}/campaigns"
+            params = {"sort_order": "desc", "range": "50"}
             
             response = requests.get(url, headers=headers, params=params, timeout=self.timeout)
-            print(f"    Status: {response.status_code}")
+            print(f"    Campaigns status: {response.status_code}")
             
             if response.status_code == 200:
                 data = response.json()
-                contacts = data.get("data", [])
-                print(f"    Found {len(contacts)} contacts!")
+                campaigns = data.get("campaigns", [])
+                print(f"    Found {len(campaigns)} campaigns!")
+                return campaigns
+            else:
+                print(f"    Response: {response.text[:300]}")
                 
-                for contact in contacts:
-                    record = self._process_contact(contact)
-                    if record:
-                        all_contacts.append(record)
-                        
         except Exception as e:
             print(f"    Error: {e}")
         
-        return all_contacts
+        return []
     
-    def _process_contact(self, contact: dict) -> Optional[Dict]:
-        """Process contact and check for suppression indicators"""
+    def get_campaign_bounces(self, campaign_id: str = None) -> List[Dict]:
+        """Get bounce data for a specific campaign or all"""
         
-        # Get email
-        email = (
-            contact.get("Email") or 
-            contact.get("email") or
-            contact.get("Contact_Email") or
-            # Try nested structure
-            contact.get("Email", {}).get("value") if isinstance(contact.get("Email"), dict) else None
-        )
+        access_token = self._get_access_token()
+        if not access_token:
+            return []
         
-        if not email:
-            return None
+        headers = {"Authorization": f"Zoho-oauthtoken {access_token}"}
+        all_bounces = []
         
-        # Check for suppression indicators
-        suppression_source = None
-        reason = None
-        rule_id = None
-        suppression_tag = None
+        # First get campaigns
+        campaigns = self.get_campaigns()
         
-        # Check various fields for suppression status
-        status = str(contact.get("Status", "")).lower() if contact.get("Status") else ""
-        lead_status = str(contact.get("Lead_Status", "")).lower() if contact.get("Lead_Status") else ""
+        for campaign in campaigns[:10]:  # Limit to recent 10
+            campaign_name = campaign.get("campaign_name", "Unknown")
+            campaign_id = campaign.get("campaign_key")
+            
+            print(f"  Checking campaign: {campaign_name}")
+            
+            try:
+                # Get campaign reports/bounces
+                url = f"{self.CAMPAIGNS_API}/campaigns/{campaign_id}/reports"
+                response = requests.get(url, headers=headers, timeout=self.timeout)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    # Extract bounce info
+                    hard_bounce = data.get("hardbounce_count", 0)
+                    soft_bounce = data.get("softbounce_count", 0)
+                    total_bounce = data.get("bounce_count", hard_bounce + soft_bounce)
+                    
+                    print(f"    Bounces: Hard={hard_bounce}, Soft={soft_bounce}")
+                    
+                    if total_bounce > 0:
+                        # Get actual bounced recipients
+                        bounce_url = f"{self.CAMPAIGNS_API}/campaigns/{campaign_id}/bounces"
+                        bounce_resp = requests.get(bounce_url, headers=headers, timeout=self.timeout)
+                        
+                        if bounce_resp.status_code == 200:
+                            bounce_data = bounce_resp.json()
+                            recipients = bounce_data.get("bounced_list", [])
+                            
+                            for rec in recipients:
+                                all_bounces.append({
+                                    "date_added": datetime.now().strftime("%m/%d/%Y"),
+                                    "platform_source": "Zoho Campaigns",
+                                    "contact_id": rec.get("contact_id", ""),
+                                    "email": rec.get("email", rec.get("email_address", "")),
+                                    "suppression_source": rec.get("bounce_type", "Hard Bounce"),
+                                    "reason": rec.get("bounce_reason", ""),
+                                    "rule_id": "R-SUP-ZOHO-001",
+                                    "suppression_tag": "suppress_zoho_campaign",
+                                    "campaign": campaign_name,
+                                    "permanent_required": "Yes",
+                                    "dnd_required": "Yes",
+                                    "workflow_removal_required": "Yes",
+                                })
+                                
+            except Exception as e:
+                print(f"    Error: {e}")
+                continue
         
-        # Check custom fields
-        for key, value in contact.items():
-            if value and isinstance(value, str):
-                value_lower = value.lower()
-                if "bounce" in value_lower or "hard bounce" in value_lower:
-                    suppression_source = "Hard Bounce"
-                    reason = value
-                    rule_id = "R-SUP-ZOHO-001"
-                    suppression_tag = "suppress_bounce"
-                    break
-                elif "unsubscrib" in value_lower:
-                    suppression_source = "Unsubscribed"
-                    reason = value
-                    rule_id = "R-SUP-ZOHO-002"
-                    suppression_tag = "suppress_unsubscribed"
-                    break
-                elif "invalid" in value_lower and "email" in value_lower:
-                    suppression_source = "Invalid Email"
-                    reason = value
-                    rule_id = "R-SUP-ZOHO-003"
-                    suppression_tag = "suppress_invalid"
-                    break
-        
-        # If no specific suppression, check if contact should be suppressed
-        if not suppression_source:
-            # For now, we'll return all contacts but mark as "Active"
-            # Only return contacts that have suppression indicators
-            return None
-        
-        record = {
-            "date_added": datetime.now().strftime("%m/%d/%Y"),
-            "platform_source": "Zoho CRM",
-            "contact_id": contact.get("id") or contact.get("id") or "",
-            "email": email,
-            "suppression_source": suppression_source,
-            "reason": reason,
-            "rule_id": rule_id,
-            "suppression_tag": suppression_tag,
-            "permanent_required": "Yes",
-            "dnd_required": "Yes",
-            "workflow_removal_required": "Yes",
-        }
-        
-        return record
+        return all_bounces
     
     def get_all_bounced_contacts(self) -> List[Dict]:
-        """Get all contacts with bounce/suppression status"""
-        return self.get_all_contacts(limit=500)
+        """Get all bounced contacts from campaigns"""
+        return self.get_campaign_bounces()
     
     def test_connection(self) -> dict:
-        """Test Zoho API connection"""
-        print("Testing Zoho API connection...")
+        """Test Zoho connection"""
+        print("Testing Zoho Campaigns API...")
         
         token = self._get_access_token()
         if token:
@@ -199,5 +171,9 @@ class ZohoClient:
 if __name__ == "__main__":
     client = ZohoClient()
     client.test_connection()
-    data = client.get_all_bounced_contacts()
-    print(f"Total: {len(data)}")
+    
+    # Get bounces
+    bounces = client.get_all_bounced_contacts()
+    print(f"\nTotal bounces: {len(bounces)}")
+    for b in bounces[:5]:
+        print(f"  {b.get('email')} - {b.get('reason')}")
