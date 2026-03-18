@@ -1,100 +1,94 @@
-# Liberty Funding - Windows Complete Installer
-# Save as install.ps1 and run: .\install.ps1
+# Libertad Capital - Windows Installer
+# Run this ONE COMMAND to install everything:
+#   irm https://raw.githubusercontent.com/vtion001/libertad-capital/main/install.ps1 | iex
 
-$ErrorActionPreference = "Continue"
-
-Write-Host "============================================" -ForegroundColor Cyan
-Write-Host "  Liberty Funding - Complete Setup" -ForegroundColor Cyan
-Write-Host "============================================" -ForegroundColor Cyan
-Write-Host ""
-
-# Install Git
-Write-Host "[1/6] Installing Git..." -ForegroundColor Yellow
-winget install -e --id Git.Git --accept-source-agreements --accept-package-agreements 2>$null
-Write-Host "  Done" -ForegroundColor Green
-
-# Install Python
-Write-Host "[2/6] Installing Python..." -ForegroundColor Yellow
-winget install -e --id Python.Python.3.12 --accept-source-agreements --accept-package-agreements 2>$null
-Write-Host "  Done" -ForegroundColor Green
+$ErrorActionPreference = "Stop"
 
 Write-Host ""
-Write-Host "  Restart PowerShell if Git/Python not found, then run again" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "  Libertad Capital - Installer" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Refresh PATH
-$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+$RepoURL = "https://github.com/vtion001/liberty-funding"
+$InstallPath = "$env:USERPROFILE\libertad-capital"
 
-# Verify
-Write-Host "[3/6] Verifying installations..." -ForegroundColor Yellow
-$git_ok = $false
-$python_ok = $false
-
-try { 
-    $gitVersion = & git --version 2>&1
-    if ($gitVersion -match "git") { 
-        Write-Host "  Git: $gitVersion" -ForegroundColor Green
-        $git_ok = $true
-    }
-} catch { Write-Host "  Git: Not found" -ForegroundColor Red }
-
-try { 
-    $pythonVersion = & python --version 2>&1
-    if ($pythonVersion -match "Python") { 
-        Write-Host "  Python: $pythonVersion" -ForegroundColor Green
-        $python_ok = $true
-    }
-} catch { Write-Host "  Python: Not found" -ForegroundColor Red }
-
-if ($git_ok -eq $false -or $python_ok -eq $false) {
-    Write-Host "Please restart PowerShell and run script again" -ForegroundColor Yellow
-    exit 1
+# 1. Install Git
+Write-Host "[1/6] Checking Git..." -ForegroundColor Yellow
+$git = Get-Command git -ErrorAction SilentlyContinue
+if (-not $git) {
+    Write-Host "  Installing Git..." -ForegroundColor Gray
+    winget install -e --id Git.Git --accept-source-agreements --accept-package-agreements --silent 2>$null
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 }
+Write-Host "  OK" -ForegroundColor Green
 
-# Clone repo
-Write-Host "[4/6] Cloning repository..." -ForegroundColor Yellow
-$InstallPath = "$env:USERPROFILE\liberty-funding"
+# 2. Install Python
+Write-Host "[2/6] Checking Python..." -ForegroundColor Yellow
+$python = Get-Command python -ErrorAction SilentlyContinue
+if (-not $python) {
+    Write-Host "  Installing Python..." -ForegroundColor Gray
+    winget install -e --id Python.Python.3.12 --accept-source-agreements --accept-package-agreements --silent 2>$null
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+    Start-Sleep 3
+}
+Write-Host "  OK" -ForegroundColor Green
 
+# 3. Clone or pull repo
+Write-Host "[3/6] Getting project files..." -ForegroundColor Yellow
 if (Test-Path $InstallPath) {
-    Write-Host "  Updating..." -ForegroundColor Yellow
     Set-Location $InstallPath
-    git pull origin main 2>$null
+    git pull origin main 2>$null | Out-Null
+    Write-Host "  Updated existing installation" -ForegroundColor Green
 } else {
-    Write-Host "  Cloning..." -ForegroundColor Yellow
-    git clone https://github.com/vtion001/liberty-funding.git $InstallPath
+    git clone $RepoURL $InstallPath 2>$null | Out-Null
     Set-Location $InstallPath
+    Write-Host "  Cloned to $InstallPath" -ForegroundColor Green
 }
 
-# Virtual environment
-Write-Host "[5/6] Setting up Python..." -ForegroundColor Yellow
-python -m venv venv
-& "$InstallPath\venv\Scripts\Activate.ps1"
+# 4. Create venv and install deps
+Write-Host "[4/6] Setting up Python environment..." -ForegroundColor Yellow
+if (-not (Test-Path "$InstallPath\venv")) {
+    python -m venv venv
+}
+& "$InstallPath\venv\Scripts\Activate.ps1" -ErrorAction SilentlyContinue
 pip install -q -r requirements.txt
+Write-Host "  Done" -ForegroundColor Green
 
-# Credentials
-Write-Host "[6/6] Credentials setup..." -ForegroundColor Yellow
-$credPath = "$InstallPath\credentials.json"
-$envPath = "$InstallPath\.env"
-
-if (-not (Test-Path $credPath)) {
-    Write-Host "  Add credentials.json to project folder" -ForegroundColor Yellow
+# 5. Create .env if missing
+Write-Host "[5/6] Creating configuration..." -ForegroundColor Yellow
+$envFile = "$InstallPath\.env"
+if (-not (Test-Path $envFile)) {
+    Copy-Item "$InstallPath\.env.example" $envFile
+    Write-Host "  Created .env - OPEN IT AND FILL IN YOUR API KEYS" -ForegroundColor Magenta
+} else {
+    Write-Host "  .env already exists" -ForegroundColor Green
 }
 
-if (-not (Test-Path $envPath)) {
-    if (Test-Path "$envPath.example") {
-        Copy-Item "$envPath.example" $envPath
-        Write-Host "  Created .env - edit with API keys" -ForegroundColor Green
-    }
+# 6. Credentials check
+Write-Host "[6/6] Checking credentials..." -ForegroundColor Yellow
+$credFile = "$InstallPath\credentials.json"
+if (-not (Test-Path $credFile)) {
+    Write-Host "  MISSING: credentials.json - add it to the project folder" -ForegroundColor Red
+} else {
+    Write-Host "  OK: credentials.json found" -ForegroundColor Green
 }
 
 Write-Host ""
-Write-Host "============================================" -ForegroundColor Green
-Write-Host "  DONE!" -ForegroundColor Green
-Write-Host "============================================" -ForegroundColor Green
+Write-Host "========================================" -ForegroundColor Green
+Write-Host "  INSTALL COMPLETE!" -ForegroundColor Green
+Write-Host "========================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "NEXT STEPS:" -ForegroundColor Yellow
-Write-Host "1. Add credentials.json" -ForegroundColor Cyan
-Write-Host "2. Edit .env with API keys" -ForegroundColor Cyan
-Write-Host "3. Share Sheet: libertad-capital-funding@...gserviceaccount.com" -ForegroundColor Cyan
-Write-Host "4. Run: run.bat" -ForegroundColor Cyan
+Write-Host "1. Edit .env with your API keys:" -ForegroundColor White
+Write-Host "   notepad $envFile" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "2. Share your Google Sheet with:" -ForegroundColor White
+Write-Host "   libertad-capital-funding@email-marketing-490517.iam.gserviceaccount.com" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "3. Test run (dry mode, no changes):" -ForegroundColor White
+Write-Host "   run-dry.bat" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "4. Full run:" -ForegroundColor White
+Write-Host "   run.bat" -ForegroundColor Cyan
 Write-Host ""

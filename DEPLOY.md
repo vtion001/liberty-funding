@@ -2,44 +2,39 @@
 
 ## Windows PowerShell (One-Line Install)
 
-Copy and paste this into PowerShell (as Administrator):
+```powershell
+irm https://raw.githubusercontent.com/vtion001/libertad-capital/main/install.ps1 | iex
+```
+
+## Update (Windows)
 
 ```powershell
-irm https://raw.githubusercontent.com/YOUR_USERNAME/liberty-funding/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/vtion001/libertad-capital/main/update.ps1 | iex
 ```
 
-## Manual Setup
+## Manual Setup (macOS / Linux / Windows Git Bash)
 
-1. Clone repository:
 ```bash
-git clone https://github.com/YOUR_USERNAME/liberty-funding.git
-cd liberty-funding
-```
+git clone https://github.com/vtion001/liberty-funding.git
+cd libertad-capital
 
-2. Create virtual environment:
-```bash
-python -m venv venv
-source venv/Scripts/activate  # Windows: venv\Scripts\activate
-```
+python3 -m venv venv
+source venv/bin/activate          # macOS/Linux
+# venv\Scripts\activate           # Windows CMD
 
-3. Install dependencies:
-```bash
 pip install -r requirements.txt
+
+cp .env.example .env
+# Edit .env with your API keys
+
+./run.sh                          # macOS/Linux
+# run.bat                          # Windows
 ```
 
-4. Configure:
-```bash
-cp config/settings.example.py config/settings.py
-# Edit settings.py with your credentials
-```
+## For Windows (without Git)
 
-5. Run:
-```bash
-python scripts/run.py
-```
-
-## For IRM to Work
-
-1. Upload this project to GitHub
-2. Replace `YOUR_USERNAME` in the URL above with your GitHub username
-3. Make the install.ps1 script accessible via raw URL
+1. Download ZIP from: https://github.com/vtion001/liberty-funding
+2. Extract to `C:\libertad-capital`
+3. Double-click `install.bat` to set up Python environment
+4. Edit `.env` with your API keys
+5. Run `run.bat`

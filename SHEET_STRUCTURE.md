@@ -1,38 +1,46 @@
-# Google Sheets Structure
+# Google Sheet Structure
 
-## Required Information
+## Required Sheet: "suppression register"
 
-Before running the script, we need:
+Create a Google Sheet tab named exactly `suppression register`.
 
-### From Client:
+## Column Headers (Row 1)
 
-1. **Spreadsheet ID**
-   - Get from Google Sheets URL:
-   - `https://docs.google.com/spreadsheets/d/[THIS_IS_THE_ID]/edit`
+Add these exact headers in row 1, column A through K:
 
-2. **Sheet Name**
-   - Name of the tab/worksheet
+| Col | Header |
+|-----|--------|
+| A | DATE ADDED |
+| B | PLATFORM SOURCE |
+| C | CONTACT ID |
+| D | EMAIL |
+| E | SUPPRESSION SOURCE |
+| F | REASON |
+| G | RULE ID |
+| H | SUPPRESSION TAG |
+| I | PERMANENT REQUIRED |
+| J | DND REQUIRED |
+| K | WORKFLOW REMOVAL REQUIRED |
 
-3. **Column Headers**
-   - Example: `Date, Source, Campaign, Bounce Rate, Total Sent, Bounced`
+## Share the Sheet
 
-4. **Sample Data** (optional but helpful)
-   - 1-2 example rows
+1. Click **Share** on the Google Sheet
+2. Add this email as **Editor**:
+   ```
+   libertad-capital-funding@email-marketing-490517.iam.gserviceaccount.com
+   ```
+3. Copy the **Spreadsheet ID** from the URL:
+   ```
+   https://docs.google.com/spreadsheets/d/[SPREADSHEET_ID_HERE]/edit
+   ```
+4. Paste it into `.env` as:
+   ```
+   SPREADSHEET_ID=your_spreadsheet_id_here
+   ```
 
-## Example Sheet Structure
+## Sheet ID
 
-| Date | Source | Campaign Name | Bounce Rate % | Total Sent | Bounced |
-|------|--------|--------------|--------------|------------|---------|
-| 2026-03-17 | GoHighLevel | Campaign 1 | 5.2 | 100 | 5 |
-| 2026-03-17 | Zoho | Campaign 2 | 3.1 | 200 | 6 |
-
-## What's Next
-
-1. Client provides the above information
-2. We configure the script
-3. Test with their data
-4. Deploy
-
----
-
-**Contact:** Vincent John Rodriguez
+The current spreadsheet ID configured:
+```
+1qktMN2WAXSXtDNn_UVWe8quJ9ysBjGUDIpWxl45efIA
+```

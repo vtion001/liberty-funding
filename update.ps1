@@ -1,42 +1,35 @@
-# Liberty Funding - Update Script
-# Run this to pull latest updates from GitHub
-# Usage: irm https://raw.githubusercontent.com/vtion001/liberty-funding/main/update.ps1 | iex
+# Libertad Capital - Update Script
+# Run this ONE COMMAND to update:
+#   irm https://raw.githubusercontent.com/vtion001/liberty-funding/main/update.ps1 | iex
 
-$ErrorActionPreference = "Continue"
+$ErrorActionPreference = "Stop"
 
-Write-Host "============================================" -ForegroundColor Cyan
-Write-Host "  Liberty Funding - Update" -ForegroundColor Cyan
-Write-Host "============================================" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "  Libertad Capital - Updater" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-$InstallPath = "$env:USERPROFILE\liberty-funding"
+$InstallPath = "$env:USERPROFILE\libertad-capital"
 
 if (-not (Test-Path $InstallPath)) {
-    Write-Host "Repository not found at: $InstallPath" -ForegroundColor Red
-    Write-Host "Run install script first:" -ForegroundColor Yellow
+    Write-Host "ERROR: Project not found at $InstallPath" -ForegroundColor Red
+    Write-Host "Run the installer first:" -ForegroundColor Yellow
     Write-Host "  irm https://raw.githubusercontent.com/vtion001/liberty-funding/main/install.ps1 | iex" -ForegroundColor Cyan
     exit 1
 }
 
-Write-Host "Pulling latest updates..." -ForegroundColor Yellow
 Set-Location $InstallPath
 
-# Refresh PATH to find git
-$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+Write-Host "Pulling latest updates..." -ForegroundColor Yellow
+git pull origin main 2>$null | Out-Null
 
-try {
-    git pull origin main
-    Write-Host "Updates pulled successfully!" -ForegroundColor Green
-} catch {
-    Write-Host "Error pulling updates: $_" -ForegroundColor Red
-}
-
-# Update dependencies if requirements changed
-Write-Host "Checking dependencies..." -ForegroundColor Yellow
-& "$InstallPath\venv\Scripts\Activate.ps1" 2>$null
-pip install -q -r requirements.txt 2>$null
+Write-Host "Updating dependencies..." -ForegroundColor Yellow
+& "$InstallPath\venv\Scripts\Activate.ps1" -ErrorAction SilentlyContinue
+pip install -q -r requirements.txt
 
 Write-Host ""
-Write-Host "Ready to run!" -ForegroundColor Green
-Write-Host "  run.bat" -ForegroundColor Cyan
+Write-Host "READY!" -ForegroundColor Green
+Write-Host "  run-dry.bat  (test mode)" -ForegroundColor Cyan
+Write-Host "  run.bat      (full run)" -ForegroundColor Cyan
 Write-Host ""

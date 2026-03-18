@@ -15,14 +15,17 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 class GoHighLevelConfig:
     """GoHighLevel API settings"""
+
     API_KEY = os.environ.get("GOHIGHLEVEL_API_KEY", "")
-    BASE_URL = "https://api.gohighlevel.com"
-    TIMEOUT = 30
+    BASE_URL = "https://services.leadconnectorhq.com"
+    API_VERSION = "2021-07-28"
+    TIMEOUT = 60
     LOCATION_ID = os.environ.get("GOHIGHLEVEL_LOCATION_ID", "")
 
 
 class ZohoConfig:
     """Zoho OAuth2 API settings"""
+
     CLIENT_ID = os.environ.get("ZOHO_CLIENT_ID", "")
     CLIENT_SECRET = os.environ.get("ZOHO_CLIENT_SECRET", "")
     ORGANIZATION_ID = os.environ.get("ZOHO_ORG_ID", "")
@@ -34,6 +37,7 @@ class ZohoConfig:
 
 class GoogleSheetsConfig:
     """Google Sheets settings"""
+
     CREDENTIALS_FILE = os.environ.get(
         "GOOGLE_CREDENTIALS", str(PROJECT_ROOT / "credentials.json")
     )

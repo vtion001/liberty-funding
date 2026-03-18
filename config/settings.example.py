@@ -1,16 +1,16 @@
-"""Example settings - copy to settings.py and fill in values"""
-
 # GoHighLevel API
-GOHIGHLEVEL_API_KEY = "your_api_key_here"
+GOHIGHLEVEL_API_KEY=your_ghl_private_integration_token_here
+GOHIGHLEVEL_LOCATION_ID=your_ghl_location_id_here
 
-# Zoho API  
-ZOHO_API_KEY = "your_api_key_here"
-ZOHO_ORG_ID = "your_org_id"
+# Zoho API
+ZOHO_CLIENT_ID=your_zoho_client_id_here
+ZOHO_CLIENT_SECRET=your_zoho_client_secret_here
+ZOHO_REFRESH_TOKEN=your_zoho_refresh_token_here
 
 # Google Sheets
-# Put your credentials.json in project root
-SPREADSHEET_ID = "your_spreadsheet_id"
-SHEET_NAME = "Bounce Rates"
+GOOGLE_CREDENTIALS=credentials.json
+SPREADSHEET_ID=your_spreadsheet_id_here
+SHEET_NAME=suppression register
 
-# Run settings
-DRY_RUN = False  # Set to True to test without updating sheets
+# Run mode
+DRY_RUN=false
