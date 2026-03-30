@@ -30,7 +30,7 @@ def normalize_key(k: str) -> str:
 class GoogleSheetsClient:
     """Client for Google Sheets API"""
 
-    HEADER_ROW = 3
+    HEADER_ROW = 1
 
     def __init__(
         self,
