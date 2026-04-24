@@ -56,6 +56,8 @@ class GoogleSheetsConfig:
         "permanent_required": "PERMANENT REQUIRED",
         "dnd_required": "DND REQUIRED",
         "workflow_removal_required": "WORKFLOW REMOVAL REQUIRED",
+        "notes": "NOTES",
+        "platform_key": "PLATFORM KEY",
     }
 
     EMAIL_COLUMN = "EMAIL"

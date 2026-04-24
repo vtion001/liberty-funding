@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Chat - Vincent & AI</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 500px;
+            padding: 30px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .status {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ccc;
+            margin-right: 5px;
+        }
+        .status-dot.listening {
+            background: #ff4444;
+            animation: pulse 1s infinite;
+        }
+        .status-dot.speaking {
+            background: #44ff44;
+            animation: pulse 0.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .conversation {
+            background: #f5f5f5;
+            border-radius: 10px;
+            padding: 15px;
+            height: 300px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+        .message {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            border-radius: 15px;
+            max-width: 80%;
+        }
+        .message.user {
+            background: #667eea;
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 5px;
+        }
+        .message.ai {
+            background: #e0e0e0;
+            color: #333;
+            border-bottom-left-radius: 5px;
+        }
+        .message .label {
+            font-size: 11px;
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        button {
+            flex: 1;
+            padding: 15px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+        .btn-listen {
+            background: #ff4444;
+            color: white;
+            min-width: 150px;
+        }
+        .btn-listen:hover {
+            background: #ff2222;
+        }
+        .btn-listen.listening {
+            background: #cc0000;
+            animation: pulse 0.5s infinite;
+        }
+        .btn-speak {
+            background: #44ff44;
+            color: #333;
+        }
+        .btn-speak:hover {
+            background: #22cc22;
+        }
+        .btn-clear {
+            background: #999;
+            color: white;
+        }
+        .transcript {
+            margin-top: 10px;
+            padding: 10px;
+            background: #fff3cd;
+            border-radius: 5px;
+            font-size: 14px;
+            display: none;
+        }
+        .transcript.active {
+            display: block;
+        }
+        .settings {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        .settings label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+            color: #666;
+        }
+        .settings input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Voice Chat</h1>
+        <div class="status">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">Ready</span>
+        </div>
+        
+        <div class="conversation" id="conversation">
+            <div class="message ai">
+                <div class="label">AI Assistant</div>
+                Hello! Press and hold the microphone button to talk to me. I'll listen and respond with voice!
+            </div>
+        </div>
+        
+        <div class="transcript" id="transcript"></div>
+        
+        <div class="controls">
+            <button class="btn-listen" id="listenBtn">🎤 Hold to Talk</button>
+            <button class="btn-speak" id="speakBtn">🔊 Test Voice</button>
+            <button class="btn-clear" id="clearBtn">🗑️ Clear</button>
+        </div>
+        
+        <div class="settings">
+            <label>Your Name:</label>
+            <input type="text" id="userName" value="Vincent" placeholder="Enter your name">
+        </div>
+    </div>
+
+    <script>
+        // State
+        let isListening = false;
+        let recognition = null;
+        let synth = window.speechSynthesis;
+        
+        // Elements
+        const conversation = document.getElementById('conversation');
+        const transcript = document.getElementById('transcript');
+        const listenBtn = document.getElementById('listenBtn');
+        const speakBtn = document.getElementById('listenBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const userNameInput = document.getElementById('userName');
+        
+        // Check browser support
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (!SpeechRecognition) {
+            alert('Speech recognition not supported in this browser. Please use Chrome or Edge.');
+        }
+        
+        // Initialize recognition
+        recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+        
+        // Recognition events
+        recognition.onstart = () => {
+            isListening = true;
+            statusDot.classList.add('listening');
+            statusText.textContent = 'Listening...';
+            listenBtn.classList.add('listening');
+            transcript.classList.add('active');
+        };
+        
+        recognition.onend = () => {
+            isListening = false;
+            statusDot.classList.remove('listening');
+            statusText.textContent = 'Ready';
+            listenBtn.classList.remove('listening');
+        };
+        
+        recognition.onresult = (event) => {
+            const result = event.results[0][0].transcript;
+            transcript.textContent = result;
+            
+            if (event.results[0].isFinal) {
+                sendMessage(result);
+            }
+        };
+        
+        recognition.onerror = (event) => {
+            console.error('Speech recognition error:', event.error);
+            statusText.textContent = 'Error: ' + event.error;
+        };
+        
+        // Button events
+        listenBtn.addEventListener('mousedown', () => {
+            if (recognition && !isListening) {
+                recognition.start();
+            }
+        });
+        
+        listenBtn.addEventListener('mouseup', () => {
+            if (recognition && isListening) {
+                recognition.stop();
+            }
+        });
+        
+        listenBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (recognition && !isListening) {
+                recognition.start();
+            }
+        });
+        
+        listenBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (recognition && isListening) {
+                recognition.stop();
+            }
+        });
+        
+        clearBtn.addEventListener('click', () => {
+            conversation.innerHTML = `
+                <div class="message ai">
+                    <div class="label">AI Assistant</div>
+                    Conversation cleared. Press and hold the microphone to talk!
+                </div>
+            `;
+        });
+        
+        speakBtn.addEventListener('click', () => {
+            speakText('Voice test successful! I can speak. Now hold the microphone button and talk to me.');
+        });
+        
+        // Functions
+        function addMessage(text, isUser) {
+            const name = isUser ? userNameInput.value || 'You' : 'AI Assistant';
+            const div = document.createElement('div');
+            div.className = `message ${isUser ? 'user' : 'ai'}`;
+            div.innerHTML = `<div class="label">${name}</div>${text}`;
+            conversation.appendChild(div);
+            conversation.scrollTop = conversation.scrollHeight;
+        }
+        
+        function sendMessage(text) {
+            addMessage(text, true);
+            transcript.textContent = '';
+            
+            // Simulate AI response (replace with actual API call)
+            statusDot.classList.add('speaking');
+            statusText.textContent = 'Thinking...';
+            
+            // Get response from OpenClaw/AI
+            fetchAIResponse(text).then(response => {
+                addMessage(response, false);
+                speakText(response);
+            });
+        }
+        
+        async function fetchAIResponse(text) {
+            // This would connect to your AI - for demo, using a simple response
+            // In production, this would call your API
+            
+            const responses = {
+                'hello': 'Hello! How can I help you today?',
+                'how are you': "I'm doing great! Thanks for asking. How can I assist you?",
+                'what time is it': `It's ${new Date().toLocaleTimeString()}.`,
+                'what date is it': `Today is ${new Date().toLocaleDateString()}.`,
+            };
+            
+            const lowerText = text.toLowerCase();
+            for (const [key, value] of Object.entries(responses)) {
+                if (lowerText.includes(key)) {
+                    return value;
+                }
+            }
+            
+            return `I heard you say: "${text}". I'm your AI assistant! In a full setup, I'd connect to OpenClaw to provide real responses. For now, let me confirm: you said "${text}". Want to continue our conversation?`;
+        }
+        
+        function speakText(text) {
+            // Cancel any current speech
+            synth.cancel();
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1;
+            utterance.pitch = 1;
+            utterance.volume = 1;
+            
+            // Try to get a good voice
+            const voices = synth.getVoices();
+            const englishVoice = voices.find(v => v.lang.startsWith('en') && v.name.includes('Google')) 
+                || voices.find(v => v.lang.startsWith('en'));
+            
+            if (englishVoice) {
+                utterance.voice = englishVoice;
+            }
+            
+            utterance.onstart = () => {
+                statusDot.classList.add('speaking');
+                statusText.textContent = 'Speaking...';
+            };
+            
+            utterance.onend = () => {
+                statusDot.classList.remove('speaking');
+                statusText.textContent = 'Ready';
+            };
+            
+            utterance.onerror = () => {
+                statusDot.classList.remove('speaking');
+                statusText.textContent = 'Ready';
+            };
+            
+            synth.speak(utterance);
+        }
+        
+        // Load voices
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = () => {
+                console.log('Voices loaded:', speechSynthesis.getVoices().length);
+            };
+        }
+    </script>
+</body>
+</html>

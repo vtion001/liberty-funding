@@ -57,7 +57,7 @@ class GoogleSheetsClient:
         """Get all data from sheet"""
         spreadsheet = self.client.open_by_key(self.spreadsheet_id)
         sheet = spreadsheet.worksheet(self.sheet_name)
-        return sheet.get_all_records(head=3)
+        return sheet.get_all_records(head=1)
 
     def _get_headers(self, sheet) -> List[str]:
         """Get normalized headers from the sheet"""
